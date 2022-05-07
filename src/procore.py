@@ -1,5 +1,6 @@
 import asyncio
 import json
+import yaml
 import aiohttp
 import logging
 from re import match, sub
@@ -112,6 +113,15 @@ class Manager(object):
                 await asyncio.sleep(0)
         logger.info("Input runner has finished")
 
+async def load_config(config_path: str) -> dict:
+    with open(config_file, 'r') as config_file:
+        if config_path.endswith('.yml'):
+            return yaml.safe_load(config_file)
+        elif config_path.endswith('.json'):
+            return json.load(config_file)
+        else:
+            raise ValueError(f'"{config_file}" is not a supported config file type. (*.json, *.yml)')
+        
 async def perform_action(action: dict = {}, data: str = '') -> None:
     if 'condition' in action.keys() and match(action['condition'], data):
         logger.debug('action condition matches data')
