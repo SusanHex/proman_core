@@ -1,8 +1,10 @@
 import asyncio
 import logging
+from re import match, sub
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
+
 class Manager(object):
     def __init__(self, cmd, manage_stdin: bool = False, dedicated_stderr: bool = False) -> None:
         self._cmd = cmd
@@ -54,12 +56,12 @@ class Manager(object):
         except asyncio.QueueEmpty:
             return b''
     
-    async def write(self, data: bytes = b'\n'):        
+    async def write(self, data: bytes = b'\r\n'):        
         if self._process.returncode is None:
-            if data.endswith(b'\n'):
+            if data.endswith(b'\r\n'):
                 self._input_queue.put(data)
             else:
-                self._input_queue.put(data + b'\n')
+                self._input_queue.put(data + b'\r\n')
 
     @staticmethod
     async def output_runner(proc: asyncio.subprocess.Process, queue: asyncio.Queue):
@@ -108,6 +110,15 @@ class Manager(object):
                 await asyncio.sleep(0)
         logger.info("Input runner has finished")
 
+async def perform_action(action: dict = {}, data: str = ''):
+    if 'condition' in action.keys() and match(action['condition'], data):
+        logger.debug('action condition matches data')
+        if 'remove_steps' in action.keys():
+            for remove_step in action['remove_steps']:
+                # pass the execution to the loop
+                asyncio.sleep(0)
+                # if the remove step matches, remove the match.
+                data = sub(remove_step, '', data)
 
 if __name__ == "__main__":
     async def main():
