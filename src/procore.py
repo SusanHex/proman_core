@@ -114,11 +114,16 @@ async def perform_action(action: dict = {}, data: str = ''):
     if 'condition' in action.keys() and match(action['condition'], data):
         logger.debug('action condition matches data')
         if 'remove_steps' in action.keys():
+            logger.debug(f"Found remove_steps: {len(action['remove_steps'])} steps")
             for remove_step in action['remove_steps']:
                 # pass the execution to the loop
                 asyncio.sleep(0)
                 # if the remove step matches, remove the match.
+                pre_data = data
                 data = sub(remove_step, '', data)
+                # helps debug steps
+                if data == pre_data:
+                    logger.warning(f'"{remove_step}" had no effect')
 
 if __name__ == "__main__":
     async def main():
