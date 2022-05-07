@@ -1,10 +1,12 @@
 import asyncio
+import json
+import aiohttp
 import logging
 from re import match, sub
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
-
+    
 class Manager(object):
     def __init__(self, cmd, manage_stdin: bool = False, dedicated_stderr: bool = False) -> None:
         self._cmd = cmd
@@ -110,7 +112,7 @@ class Manager(object):
                 await asyncio.sleep(0)
         logger.info("Input runner has finished")
 
-async def perform_action(action: dict = {}, data: str = ''):
+async def perform_action(action: dict = {}, data: str = '') -> None:
     if 'condition' in action.keys() and match(action['condition'], data):
         logger.debug('action condition matches data')
         if 'remove_steps' in action.keys():
@@ -124,6 +126,19 @@ async def perform_action(action: dict = {}, data: str = ''):
                 # helps debug steps
                 if data == pre_data:
                     logger.warning(f'"{remove_step}" had no effect')
+        if 'web' in action.keys():
+            session = aiohttp.ClientSession()
+            await web_action(session=session, scheme=action['web'], data=data)
+
+async def web_action(session: aiohttp.ClientSession, scheme: dict = {}, data: str = '') -> None:
+    url = scheme['url']
+    method = scheme['method'] if scheme.get('method') else 'POST'
+    body = json.dumps(scheme['body'])
+    if '<data>' in body:
+        body = body.replace('<data>', data)
+        logger.debug('Replaced data in body')
+    async with session.request(method=method, url=url, data=body) as req:
+        logger.debug(req)
 
 if __name__ == "__main__":
     async def main():
