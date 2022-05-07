@@ -13,6 +13,12 @@ class Manager(object):
         self._cmd = cmd
         self._manage_stdin = manage_stdin
         self._dedicated_stderr = dedicated_stderr
+        self._process = None
+    
+    def __del__(self):
+        if not self._process is None:
+            logger.debug('Killing the process')
+            self._process.kill()
         
     async def start(self) -> None:
         if self._dedicated_stderr and self._manage_stdin:
@@ -55,7 +61,7 @@ class Manager(object):
     
     async def read(self):
         try:
-            return await self._output_queue.get()
+            return await self._output_queue.get_nowait()
         except asyncio.QueueEmpty:
             return b''
     
@@ -114,7 +120,7 @@ class Manager(object):
         logger.info("Input runner has finished")
 
 async def load_config(config_path: str) -> dict:
-    with open(config_file, 'r') as config_file:
+    with open(config_path, 'r') as config_file:
         if config_path.endswith('.yml'):
             return yaml.safe_load(config_file)
         elif config_path.endswith('.json'):
@@ -152,10 +158,17 @@ async def web_action(session: aiohttp.ClientSession, scheme: dict = {}, data: st
 
 if __name__ == "__main__":
     async def main():
-        proc = Manager(r"echo hello && pause")
+        logger.setLevel(logging.DEBUG)
+        from sys import argv
+        config = await load_config(argv[1])
+        proc = Manager(config['command'])
         await proc.start()
         while proc._process.returncode is None:
-            print((await proc.read()).decode(), end='')
+            data = (await proc.read()).decode()
+            # await perform_action(action=config['action'], data=data)
+            print(data, end='')
+        logger.debug('Main function has stopped the loop')
+        asyncio.get_running_loop().close()
 
 
     asyncio.run(main())
