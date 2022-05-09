@@ -61,7 +61,7 @@ class Manager(object):
     
     async def read(self):
         try:
-            return await self._output_queue.get_nowait()
+            return await self._output_queue.get()
         except asyncio.QueueEmpty:
             return b''
     
@@ -129,6 +129,7 @@ async def load_config(config_path: str) -> dict:
             raise ValueError(f'"{config_file}" is not a supported config file type. (*.json, *.yml)')
         
 async def perform_action(action: dict = {}, data: str = '') -> None:
+    logger.debug(f"{__name__} is starting")
     if 'condition' in action.keys() and match(action['condition'], data):
         logger.debug('action condition matches data')
         if 'remove_steps' in action.keys():
