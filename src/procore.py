@@ -19,7 +19,7 @@ class Manager(object):
         self._process = None
 
     def __del__(self):
-        if not self._process is None:
+        if self._process is not None:
             logger.debug("Killing the process")
             self._process.kill()
 
@@ -152,7 +152,9 @@ async def perform_action(action: dict = {}, data: str = "") -> None:
     if "condition" in action.keys() and match(action["condition"], data):
         logger.debug("action condition matches data")
         if "remove_steps" in action.keys():
-            logger.debug(f"Found remove_steps: {len(action['remove_steps'])} steps")
+            logger.debug(
+                f"Found remove_steps: " f" {len(action['remove_steps'])} steps"
+            )
             for remove_step in action["remove_steps"]:
                 # pass the execution to the loop
                 asyncio.sleep(0)
