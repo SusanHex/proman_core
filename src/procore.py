@@ -19,7 +19,7 @@ class Manager(object):
         self._process = None
 
     def __del__(self):
-        if self._process is not None:
+        if self._process is not None and self._process.returncode is None:
             logger.debug("Killing the process")
             self._process.kill()
 
@@ -58,7 +58,6 @@ class Manager(object):
         self._input_queue = asyncio.Queue()
         logger.info("Created the queues")
         # create the tasks
-
         self._output_task = asyncio.create_task(
             Manager.output_runner(self._process, self._output_queue)
         )
@@ -73,10 +72,12 @@ class Manager(object):
         logger.info("Created the task(s)")
 
     async def read(self):
-        try:
-            return await self._output_queue.get()
-        except asyncio.QueueEmpty:
-            return b""
+        if self._process.returncode is None:
+            try:
+                return await self._output_queue.get()
+            except asyncio.QueueEmpty:
+                return b""
+        return None
 
     async def write(self, data: bytes = b"\r\n"):
         if self._process.returncode is None:
@@ -148,7 +149,6 @@ async def load_config(config_path: str) -> dict:
 
 
 async def perform_action(action: dict = {}, data: str = "") -> None:
-    logger.debug(f"{__name__} is starting")
     if "condition" in action.keys() and match(action["condition"], data):
         logger.debug("action condition matches data")
         if "remove_steps" in action.keys():
@@ -188,14 +188,18 @@ if __name__ == "__main__":
         logger.setLevel(logging.DEBUG)
         from sys import argv
 
-        config = await load_config(argv[1])
+        if len(argv) > 1:
+            config = await load_config(argv[1])
+        else:
+            config = await load_config(
+                r"C:\Users\jbloo\Documents\Git\proman_core\config.json"
+            )
         proc = Manager(config["command"])
         await proc.start()
-        while proc._process.returncode is None:
-            data = (await proc.read()).decode()
-            # await perform_action(action=config['action'], data=data)
+        while (data := await proc.read()) is not None:
+            data = data.decode()
+            await perform_action(action=config["action"], data=data)
             print(data, end="")
         logger.debug("Main function has stopped the loop")
-        asyncio.get_running_loop().close()
 
-    asyncio.run(main())
+    asyncio.run(main(), debug=True)
