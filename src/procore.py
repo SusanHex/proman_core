@@ -1,7 +1,6 @@
 import asyncio
 import json
 import yaml
-import aiohttp
 import logging
 from re import match, sub
 
@@ -158,22 +157,6 @@ async def perform_action(action: dict = {}, data: str = "") -> None:
                 # helps debug steps
                 if data == pre_data:
                     logger.warning(f'"{remove_step}" had no effect')
-        if "web" in action.keys():
-            session = aiohttp.ClientSession()
-            await web_action(session=session, scheme=action["web"], data=data)
-
-
-async def web_action(
-    session: aiohttp.ClientSession, scheme: dict = {}, data: str = ""
-) -> None:
-    url = scheme["url"]
-    method = scheme["method"] if scheme.get("method") else "POST"
-    body = json.dumps(scheme["body"])
-    if "<data>" in body:
-        body = body.replace("<data>", data)
-        logger.debug("Replaced data in body")
-    async with session.request(method=method, url=url, data=body) as req:
-        logger.debug(req)
 
 
 if __name__ == "__main__":
