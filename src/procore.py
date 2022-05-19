@@ -72,13 +72,7 @@ class Manager(object):
         logger.info("Created the task(s)")
 
     async def read(self):
-        if self._process.returncode is None:
-            try:
-                return await self._output_queue.get()
-            except asyncio.QueueEmpty:
-                return b""
-        logger.info("Process ")
-        return None
+        return await self._output_queue.get()
 
     async def write(self, data: bytes = b"\r\n"):
         if self._process.returncode is None:
@@ -99,9 +93,8 @@ class Manager(object):
             except asyncio.QueueFull:
                 logger.warning(f'Output queue is full, removing "{await queue.get()}"')
                 await queue.put(data)
-            await asyncio.sleep(0)
-        print(asyncio.all_tasks())
-        logger.debug("Output runner has finished")
+        await queue.put(b"")
+        logger.debug("Output runner has finished, sending empty byte string")
 
     @staticmethod
     async def error_runner(proc: asyncio.subprocess.Process, queue: asyncio.Queue):
@@ -197,10 +190,11 @@ if __name__ == "__main__":
             )
         proc = Manager(config["command"])
         await proc.start()
-        while (data := await proc.read()) is not None:
-            data = data.decode()
-            await perform_action(action=config["action"], data=data)
-            print(data, end="")
+        while data := await proc.read():
+            if data:
+                data = data.decode()
+                await perform_action(action=config["action"], data=data)
+                print(data, end="")
         logger.debug("Main function has stopped the loop")
 
-    asyncio.run(main(), debug=True)
+    asyncio.run(main())
