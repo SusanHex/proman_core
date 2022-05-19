@@ -77,14 +77,15 @@ class Manager(object):
                 return await self._output_queue.get()
             except asyncio.QueueEmpty:
                 return b""
+        logger.info("Process ")
         return None
 
     async def write(self, data: bytes = b"\r\n"):
         if self._process.returncode is None:
             if data.endswith(b"\r\n"):
-                self._input_queue.put(data)
+                await self._input_queue.put(data)
             else:
-                self._input_queue.put(data + b"\r\n")
+                await self._input_queue.put(data + b"\r\n")
 
     @staticmethod
     async def output_runner(proc: asyncio.subprocess.Process, queue: asyncio.Queue):
@@ -93,13 +94,13 @@ class Manager(object):
             data = await proc.stdout.readline()
             if not data:
                 break
-            logger.debug(f'Output runner: "{data}", {proc.returncode} {bool(data)}')
             try:
                 await queue.put(data)
             except asyncio.QueueFull:
                 logger.warning(f'Output queue is full, removing "{await queue.get()}"')
                 await queue.put(data)
             await asyncio.sleep(0)
+        print(asyncio.all_tasks())
         logger.debug("Output runner has finished")
 
     @staticmethod
@@ -157,7 +158,7 @@ async def perform_action(action: dict = {}, data: str = "") -> None:
             )
             for remove_step in action["remove_steps"]:
                 # pass the execution to the loop
-                asyncio.sleep(0)
+                await asyncio.sleep(0)
                 # if the remove step matches, remove the match.
                 pre_data = data
                 data = sub(remove_step, "", data)
