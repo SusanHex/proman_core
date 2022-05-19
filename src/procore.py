@@ -1,11 +1,30 @@
 import asyncio
+import imp
 import json
+from multiprocessing import Condition
 import yaml
 import logging
-from re import match, sub
+from re import match, sub, compile, Pattern
+from importlib import import_module
+from typing import Callable
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
+
+
+class Action(object):
+    def __init__(
+        self, condition: Pattern, action_callable: Callable, remove_patterns: list = []
+    ) -> None:
+        self._condidtion = condition
+        self._callable = action_callable
+        self._remove_patterns = remove_patterns
+
+
+class Actions(object):
+    async def register_actions(self, actions: list = []) -> None:
+        for action in actions:
+            self._actions.append(action(**action))
 
 
 class Manager(object):
