@@ -1,7 +1,5 @@
 import asyncio
-import imp
 import json
-from multiprocessing import Condition
 import yaml
 import logging
 from re import match, sub, compile, Pattern
@@ -19,8 +17,16 @@ class Action(object):
         self._condition = condition
         self._callable = action_callable
         self._remove_patterns = remove_patterns
+        self._actions = []
 
     async def perform_action(self, data: bytes = b""):
+        """This function will test the data against the condtion.
+        If it matches, it will perform removal steps and pass it to the callable.
+
+        Args:
+            data (bytes, optional): This value is the data that will be checked against
+            the condition. Defaults to b"".
+        """
         decoded_data = data.decode()
         if match(self._condition, decoded_data):
             for pattern in self._remove_patterns:
@@ -30,6 +36,13 @@ class Action(object):
 
 class Actions(object):
     async def register_actions(self, actions: list = []) -> None:
+        """This function will compile all patterns, import the callable,
+        and keep track of the actions.
+
+        Args:
+            actions (list, optional): This should  be a list of action dicts.
+            Defaults to [].
+        """
         for action in actions:
             action_condition = compile(action["condition"])
             action_remove_patterns = []
@@ -44,6 +57,16 @@ class Actions(object):
                     remove_patterns=action_remove_patterns,
                 )
             )
+
+    async def perform_actions(self, data: bytes = b""):
+        """This function will call perform_action and pass data on all registed actions.
+
+        Args:
+            data (bytes, optional): This is the value to run the actions on.
+            Defaults to b"".
+        """
+        for action in self._actions:
+            await action.perform_action(data)
 
 
 class Manager(object):
@@ -61,6 +84,7 @@ class Manager(object):
             self._process.kill()
 
     async def start(self) -> None:
+        # This will initallize the stderr and stdin with PIPEs
         if self._dedicated_stderr and self._manage_stdin:
             self._process = await asyncio.subprocess.create_subprocess_shell(
                 self._cmd,
@@ -68,12 +92,14 @@ class Manager(object):
                 stdout=asyncio.subprocess.PIPE,
                 stdin=asyncio.subprocess.PIPE,
             )
+        # This one just sets the stderr and stdout to PIPEs
         elif self._dedicated_stderr:
             self._process = await asyncio.subprocess.create_subprocess_shell(
                 self._cmd,
                 stderr=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
             )
+        # This one is just for PIPEing the stdin
         elif self._manage_stdin:
             self._process = await asyncio.subprocess.create_subprocess_shell(
                 self._cmd,
@@ -81,6 +107,7 @@ class Manager(object):
                 stdout=asyncio.subprocess.PIPE,
                 stdin=asyncio.subprocess.PIPE,
             )
+        # This one does not create dedicated PIPEs for stdin or stderr.
         else:
             self._process = await asyncio.subprocess.create_subprocess_shell(
                 self._cmd,
@@ -108,7 +135,7 @@ class Manager(object):
             )
         logger.info("Created the task(s)")
 
-    async def read(self):
+    async def read(self) -> bytes:
         return await self._output_queue.get()
 
     async def write(self, data: bytes = b"\r\n"):
@@ -179,22 +206,24 @@ async def load_config(config_path: str) -> dict:
             )
 
 
-async def perform_action(action: dict = {}, data: str = "") -> None:
-    if "condition" in action.keys() and match(action["condition"], data):
-        logger.debug("action condition matches data")
-        if "remove_steps" in action.keys():
-            logger.debug(
-                f"Found remove_steps: " f" {len(action['remove_steps'])} steps"
-            )
-            for remove_step in action["remove_steps"]:
-                # pass the execution to the loop
-                await asyncio.sleep(0)
-                # if the remove step matches, remove the match.
-                pre_data = data
-                data = sub(remove_step, "", data)
-                # helps debug steps
-                if data == pre_data:
-                    logger.warning(f'"{remove_step}" had no effect')
+# This is the legacy action system. Kept in for reference. \
+# However, will remove eventually
+# async def perform_action(action: dict = {}, data: str = "") -> None:
+#     if "condition" in action.keys() and match(action["condition"], data):
+#         logger.debug("action condition matches data")
+#         if "remove_steps" in action.keys():
+#             logger.debug(
+#                 f"Found remove_steps: " f" {len(action['remove_steps'])} steps"
+#             )
+#             for remove_step in action["remove_steps"]:
+#                 # pass the execution to the loop
+#                 await asyncio.sleep(0)
+#                 # if the remove step matches, remove the match.
+#                 pre_data = data
+#                 data = sub(remove_step, "", data)
+#                 # helps debug steps
+#                 if data == pre_data:
+#                     logger.warning(f'"{remove_step}" had no effect')
 
 
 if __name__ == "__main__":
@@ -209,12 +238,14 @@ if __name__ == "__main__":
             config = await load_config(
                 r"C:\Users\jbloo\Documents\Git\proman_core\config.json"
             )
+        # create and register the actions stored in the config
+
         proc = Manager(config["command"])
         await proc.start()
         while data := await proc.read():
             if data:
                 data = data.decode()
-                await perform_action(action=config["action"], data=data)
+                # await perform_action(action=config["action"], data=data)
                 print(data, end="")
         logger.debug("Main function has stopped the loop")
 
