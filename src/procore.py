@@ -16,15 +16,34 @@ class Action(object):
     def __init__(
         self, condition: Pattern, action_callable: Callable, remove_patterns: list = []
     ) -> None:
-        self._condidtion = condition
+        self._condition = condition
         self._callable = action_callable
         self._remove_patterns = remove_patterns
+
+    async def perform_action(self, data: bytes = b""):
+        decoded_data = data.decode()
+        if match(self._condition, decoded_data):
+            for pattern in self._remove_patterns:
+                decoded_data = sub(pattern=pattern, repl="", string=decoded_data)
+            self._callable(decoded_data)
 
 
 class Actions(object):
     async def register_actions(self, actions: list = []) -> None:
         for action in actions:
-            self._actions.append(action(**action))
+            action_condition = compile(action["condition"])
+            action_remove_patterns = []
+            if precompiled_patterns := action.get("remove_patterns"):
+                for precompiled_patttern in precompiled_patterns:
+                    action_remove_patterns.append(compile(precompiled_patttern))
+            action_callable = import_module(action["callable"])
+            self._actions.append(
+                Action(
+                    condition=action_condition,
+                    action_callable=action_callable,
+                    remove_patterns=action_remove_patterns,
+                )
+            )
 
 
 class Manager(object):
