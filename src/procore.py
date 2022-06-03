@@ -68,6 +68,12 @@ class Actions(object):
         for action in self._actions:
             await action.perform_action(data)
 
+    async def _register_callable(self, file_function: str) -> Callable:
+        pass
+        # spec = ilu.spec_from_file_location(file, folder)
+        # callable_lib = ilu.module_from_spec(spec)
+        # spec.loader.exec_module(callable_lib)
+
 
 class Manager(object):
     def __init__(
